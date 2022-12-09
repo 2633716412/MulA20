@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.View;
 
@@ -11,6 +12,7 @@ import androidx.annotation.Nullable;
 
 import com.example.mula20.Modules.LogHelper;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -71,9 +73,9 @@ public class BaseActivity extends Activity {
                 dView.destroyDrawingCache();
                 dView.buildDrawingCache();
                 bmp = dView.getDrawingCache();
-                /*bmp = Bitmap.createBitmap(dView.getWidth(), dView.getHeight(), Bitmap.Config.ARGB_8888);
+                bmp = Bitmap.createBitmap(dView.getWidth(), dView.getHeight(), Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(bmp);
-                dView.draw(canvas);*/
+                dView.draw(canvas);
 
             }
         } catch (Exception ex) {
@@ -82,7 +84,33 @@ public class BaseActivity extends Activity {
             return bmp;
         }
     }
+    public static Bitmap Screenshot2() {
+        View cv = currActivity.getWindow().getDecorView();
+        Bitmap bmp = Bitmap.createBitmap(cv.getWidth(), cv.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        cv.draw(canvas);
+        return bmp;
+    }
 
+    public static Bitmap Screenshot3() {
+        Class<?> surfaceClass;
+        Bitmap bitmap=null;
+        Method method;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                surfaceClass = Class.forName("android.view.SurfaceControl");
+            } else {
+                surfaceClass = Class.forName("android.view.Surface");
+            }
+            method = surfaceClass.getDeclaredMethod("screenshot", Integer.TYPE, Integer.TYPE);
+            method.setAccessible(true);
+            View cv = currActivity.getWindow().getDecorView();
+            bitmap =  (Bitmap)method.invoke(null, cv.getWidth(), cv.getHeight());
+        } catch (Exception e) {
+            LogHelper.Error(e);
+        }
+        return bitmap;
+    }
     @Override
     protected void onDestroy() {
         lock.lock();

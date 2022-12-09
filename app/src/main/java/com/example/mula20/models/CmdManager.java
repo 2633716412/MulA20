@@ -5,6 +5,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.os.Handler;
 import android.os.SystemClock;
 
@@ -48,13 +49,10 @@ public class CmdManager {
     static FileUnitDef fileUnitDef;
     static boolean firstShut=true;
     public void Init(final Context context, final Action<String> OnIniEnd) {
-        Handler handler=new Handler();
+        //Handler handler=new Handler();
         final SPUnit spUnit = new SPUnit(context);
         final DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
-
-
         Paras.volume = 100;
-
         fileUnitDef = new FileUnitDef();
         Paras.name = deviceData.getDevice_name();
         Paras.devType=deviceData.device_type;
@@ -63,26 +61,44 @@ public class CmdManager {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    JSONObject jsonObject=new JSONObject();
-                    jsonObject.put("id",deviceData.getId());
-                    jsonObject.put("device_name",deviceData.getDevice_name());
-                    jsonObject.put("device_ip",deviceData.getDevice_ip());
-                    jsonObject.put("mac",deviceData.getMac());
-                    jsonObject.put("os","");
-                    String jsonStr= HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/sava",jsonObject.toString());
-                    JSONObject object= new JSONObject(jsonStr);
-                    boolean res=object.getBoolean("success");
-                    if(!res) {
-                        LogHelper.Error("保存失败"+object.getString("msg"));
+                boolean isStopped=false;
+                while (!isStopped) {
+                    try {
+                        JSONObject jsonObject=new JSONObject();
+                        jsonObject.put("id",deviceData.getId());
+                        jsonObject.put("device_name",deviceData.getDevice_name());
+                        jsonObject.put("device_ip",deviceData.getDevice_ip());
+                        jsonObject.put("mac",deviceData.getMac());
+                        String androidNumStr="Android "+ Build.VERSION.RELEASE;
+                        jsonObject.put("os",androidNumStr);
+                        String jsonStr="";
+                        try {
+                            jsonStr= HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/sava",jsonObject.toString());
+                        } catch (Exception e) {
+                            LogHelper.Error("保存设备异常："+e);
+                        }
+                        if(!Objects.equals(jsonStr, "")) {
+                            isStopped=true;
+                            JSONObject object= new JSONObject(jsonStr);
+                            boolean res=object.getBoolean("success");
+                            if(!res) {
+                                LogHelper.Error("保存失败"+object.getString("msg"));
+                            }
+                            if(deviceData.getId()<=0) {
+                                deviceData.setId(object.getLong("data"));
+                                spUnit.Set("DeviceData",deviceData);
+                            }
+                        }
+                    } catch (Exception e) {
+                        LogHelper.Error(e);
                     }
-                    if(deviceData.getId()<=0) {
-                        deviceData.setId(object.getLong("data"));
-                        spUnit.Set("DeviceData",deviceData);
+                    try {
+                        Thread.sleep(5000);
+                    } catch (Exception e) {
+
                     }
-                } catch (Exception e) {
-                    LogHelper.Error(e);
                 }
+
             }
         });
         thread.start();
@@ -107,10 +123,28 @@ public class CmdManager {
                         try {
                             while (deviceData.getId()>0) {
                                 String jsonStr="";
+                                //更新心跳时间
+                                JSONObject updateObject=new JSONObject();
+                                updateObject.put("device_id",deviceData.getId());
+                                updateObject.put("is_record",1);
+                                String updateRes="";
+                                try {
+                                    updateRes= HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/updateHeartTime",updateObject.toString());
+                                } catch (Exception e) {
+                                    LogHelper.Error("更新心跳时间异常："+e);
+                                    Paras.updateProgram=true;
+                                }
+                                if(!Objects.equals(updateRes, "")) {
+                                    JSONObject timeObject= new JSONObject(updateRes);
+                                    boolean res = timeObject.getBoolean("success");
+                                    if(res) {
+                                        LogHelper.Debug("更新心跳时间成功");
+                                    }
+                                }
                                 try {
                                     jsonStr= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getCmd"+"?device_id="+deviceData.getId());
                                 } catch (Exception e) {
-                                    LogHelper.Error(e);
+                                    LogHelper.Error("获取命令异常："+e);
                                 }
                                 if(!Objects.equals(jsonStr, "")) {
                                     JSONObject object= new JSONObject(jsonStr);
@@ -123,18 +157,7 @@ public class CmdManager {
                                         contentObject=new JSONObject(content);
                                     }
 
-                                    //更新心跳时间
-                                    JSONObject updateObject=new JSONObject();
-                                    updateObject.put("device_id",deviceData.getId());
-                                    updateObject.put("is_record",1);
-                                    String updateRes= HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/updateHeartTime",updateObject.toString());
-                                    if(!Objects.equals(updateRes, "")) {
-                                        JSONObject timeObject= new JSONObject(updateRes);
-                                        boolean res = timeObject.getBoolean("success");
-                                        if(res) {
-                                            LogHelper.Debug("更新心跳时间成功");
-                                        }
-                                    }
+
                                     if (!code.equals("")) {
                                         switch (code) {
                                             case "1002":
@@ -285,7 +308,8 @@ public class CmdManager {
                                                 LogHelper.Debug("日志提取完成：" + LogHelper.logFilePath);
                                                 break;
                                             case "1013":
-                                                String voiceTxt = contentObject.getString("VoiceData");
+                                                //String voiceTxt = contentObject.getString("VoiceData");
+                                                String voiceTxt=" 请张三到中医科室就诊";
                                                 Paras.msgManager.SendMsg("开始呼叫：" + voiceTxt);
                                                 LogHelper.Debug("开始呼叫：" + voiceTxt);
                                                 //TextSpeaker.Read(voiceTxt);
@@ -298,6 +322,8 @@ public class CmdManager {
                                     else {
                                         break;
                                     }
+                                } else {
+                                    break;
                                 }
                             }
                             //Thread.sleep(3000);
@@ -309,30 +335,48 @@ public class CmdManager {
 
             }
         });
-
-        PollingUtil pollingUtil=new PollingUtil(handler);
-        pollingUtil.startPolling(task,3000,true);
-
-        //task.start();
+        PollingUtil pollingUtil=new PollingUtil(Paras.handler);
+        if(!Paras.hasRun[0]) {
+            pollingUtil.startPolling(task,3000,true);
+            Paras.hasRun[0]=true;
+        }
 
         //定时开关机监测
-        new Thread(new Runnable() {
+        Thread listenThread=new Thread(new Runnable() {
             @Override
             public void run() {
                 {
                     Paras.powerManager.setSystemTime(context);
                     try {
-                        Thread.sleep(Paras.time_start_listen_power * 1000);
+                        //Thread.sleep(Paras.time_start_listen_power * 1000);
                         Paras.powerManager.StartListen();
                     } catch (Exception ex) {
                         LogHelper.Error(ex);
                     }
                 }
             }
-        }).start();
+        });
+        if(!Paras.hasRun[1]) {
+            pollingUtil.startPolling(listenThread,Paras.time_start_listen_power * 1000,false);
+            Paras.hasRun[1]=true;
+        }
 
-
-        //每天的23:59:59获取一次日志
+        /*listenThread.setName("listenThread");
+        boolean hasListenThread=false;
+        Map<Thread, StackTraceElement[]> map = Thread.currentThread().getAllStackTraces();
+        if (map != null && map.size() != 0) {
+            Iterator keyIterator = map.keySet().iterator();
+            while (keyIterator.hasNext()) {
+                Thread eachThread = (Thread) keyIterator.next();
+                if(Objects.equals(eachThread.getName(), listenThread.getName())) {
+                    hasListenThread=true;
+                }
+            }
+        }
+        if(!hasListenThread) {
+            listenThread.start();
+        }*/
+        //每天的23:59:50获取一次日志
         Timer timer = new Timer(true);
         TimerTask timerTask = new TimerTask() {
             @Override
@@ -365,10 +409,11 @@ public class CmdManager {
         Calendar calendar = Calendar.getInstance();
         calendar.set(Calendar.HOUR_OF_DAY, 23);
         calendar.set(Calendar.MINUTE, 59);
-        calendar.set(Calendar.SECOND, 59);
+        calendar.set(Calendar.SECOND, 50);
         long lastTime=calendar.getTime().getTime();
         long nowTime=new Date().getTime();
         long delay=lastTime-nowTime;
+
         timer.schedule(timerTask,delay ,85400000);
 
         //默认30分钟截屏一次
@@ -410,47 +455,10 @@ public class CmdManager {
                 }).start();
             }
         });
-        PollingUtil shutPolling=new PollingUtil(handler);
-        shutPolling.startPolling(shutThread,1800000,true);
-    }
-
-    public static void openApplicationFromBackground(Context context) {
-        Intent intent;
-        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningTaskInfo> list = am.getRunningTasks(100);
-        if (!list.isEmpty() && list.get(0).topActivity.getPackageName().equals(context.getPackageName())) {
-            //此时应用正在前台, 不作处理
-            return;
+        if(!Paras.hasRun[2]) {
+            pollingUtil.startPolling(shutThread,1800000,true);
+            Paras.hasRun[2]=true;
         }
-        /*for (ActivityManager.RunningTaskInfo info : list) {
-            if (info.topActivity.getPackageName().equals(context.getPackageName())) {
-                intent = new Intent();
-                intent.setComponent(info.topActivity);
-                intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                if (! (context instanceof Activity)) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                }
-                context.startActivity(intent);
-                return;
-            }
-        }*/
-        intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-        context.startActivity(intent);
-    }
-
-    public static boolean isAppForeground(Context context){
-        ActivityManager activityManager = (ActivityManager) context.getSystemService(Service.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningAppProcessInfo> runningAppProcessInfoList = activityManager.getRunningAppProcesses();
-        if (runningAppProcessInfoList==null){
-            return false;
-        }
-        for (ActivityManager.RunningAppProcessInfo processInfo : runningAppProcessInfoList) {
-            if (processInfo.processName.equals(context.getPackageName()) &&
-                    processInfo.importance==ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND){
-                return true;
-            }
-        }
-        return false;
     }
 
 }

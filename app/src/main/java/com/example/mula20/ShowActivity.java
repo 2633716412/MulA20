@@ -1,15 +1,16 @@
 package com.example.mula20;
 
 import android.annotation.SuppressLint;
-import android.graphics.Canvas;
+import android.graphics.Bitmap;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 public class ShowActivity extends BaseActivity {
 
@@ -40,7 +42,6 @@ public class ShowActivity extends BaseActivity {
     private Button btn;
     private boolean waitDouble = true;
     private Date endTime=new Date();
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,29 +57,56 @@ public class ShowActivity extends BaseActivity {
         webSetting1.setJavaScriptEnabled(true);
         webSetting1.setDomStorageEnabled(true);
         webSetting1.setAllowFileAccess(true);
-        webSetting1.setMediaPlaybackRequiresUserGesture(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            webSetting1.setMediaPlaybackRequiresUserGesture(false);
+        }
         webView1.setWebChromeClient(new WebChromeClient());
         //webView1.setBackgroundColor(0); // 设置背景色
         webView2=  findViewById(R.id.webView2);
         webView2.setBackgroundColor(0); // 设置背景色
-        webView2.setWebChromeClient(new WebChromeClient());
+
+        webView2.setWebViewClient(new WebViewClient() {
+            // 解决H5的音视频不能自动播放的问题
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                //view.loadUrl("javascript:palyVideo()");
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url,
+                                      Bitmap favicon) {
+
+                super.onPageStarted(view, url, favicon);
+            }
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                view.loadUrl(url);
+                return false;
+            }
+
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error){
+                handler.proceed();
+            }
+        });
+        webView2.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onShowCustomView(View view, CustomViewCallback callback) {
+                super.onShowCustomView(view, callback);
+            }
+        });
+
         WebSettings webSetting2=webView2.getSettings();
         webSetting2.setJavaScriptEnabled(true);
-        /*webView2.setLayerType(WebView.LAYER_TYPE_HARDWARE,null);
+        webSetting2.setPluginState(WebSettings.PluginState.ON);
+        webSetting2.setUseWideViewPort(true); //将图片调整到适合webview的大小
+        webSetting2.setLoadWithOverviewMode(true); // 缩放至屏幕的大小
 
-        webView2.setDrawingCacheEnabled(false);
-
-        getWindow().setFlags(
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
-        //webSetting2.setLoadsImagesAutomatically(true);
-        webSetting2.setDomStorageEnabled(true);
-        webSetting2.setAppCacheEnabled(true);
-        webSetting2.setCacheMode(WebSettings.LOAD_DEFAULT);
-        webSetting2.setDefaultTextEncodingName("utf-8");
-        webSetting2.setUseWideViewPort(true);
-        webSetting2.setLoadWithOverviewMode(true);*/
-        webSetting2.setMediaPlaybackRequiresUserGesture(false);
+        webSetting2.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.SINGLE_COLUMN);//设置自适应屏幕的算法，一般是LayoutAlgorithm.SINGLE_COLUMN。如果不做设置，4.2.2及之前版本自适应时可能会出现表格错乱的情况
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            webSetting2.setMediaPlaybackRequiresUserGesture(false);
+        }
         //webView2.getBackground().setAlpha(0); // 设置填充透明度 范围：0-255
         //webView2.loadUrl("http://192.168.9.201:14084/selfpc2/app/index.html?id=10024");
 
@@ -145,9 +173,10 @@ public class ShowActivity extends BaseActivity {
             try {
                 jsonStr = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getProgramData?device_id=" + id);
             } catch (Exception e) {
-                LogHelper.Error(e);
+                LogHelper.Error("获取节目异常："+e);
+                Paras.updateProgram=true;
             }
-            if(jsonStr!="") {
+            if(!Objects.equals(jsonStr, "")) {
                 JSONObject object = new JSONObject(jsonStr);
                 StringBuilder url = new StringBuilder(Paras.mulHtmlAddr);
                 String wvUrl="";
@@ -225,10 +254,21 @@ public class ShowActivity extends BaseActivity {
             webView1.onPause();
         }
     }
-    @Override
+/*    @Override
     public void onResume() {
         super.onResume();
         webView2.onResume();
         webView1.onResume();
-    }
+    }*/
+@Override
+protected void onDestroy() {
+    super.onDestroy();
+    super.onDestroy();
+    webView2.loadUrl("about:blank");
+    webView2.stopLoading();
+    webView2.setWebChromeClient(null);
+    webView2.setWebViewClient(null);
+    webView2.destroy();
+    webView2 = null;
+}
 }

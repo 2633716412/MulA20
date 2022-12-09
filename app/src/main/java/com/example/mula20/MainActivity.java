@@ -14,6 +14,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.mula20.HttpUnit.HttpUnitFactory;
 import com.example.mula20.Modules.DeviceData;
 import com.example.mula20.Modules.IMsgManager;
 import com.example.mula20.Modules.LogHelper;
@@ -22,6 +23,8 @@ import com.example.mula20.Modules.Paras;
 import com.example.mula20.Modules.SPUnit;
 import com.example.mula20.models.CmdManager;
 import com.example.mula20.models.DropData;
+
+import org.json.JSONObject;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -50,6 +53,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         setContentView(R.layout.activity_main);
         Paras.appContext=this;
         Paras.msgManager=this;
+        Paras.handler=new Handler();
         /*Intent intent = new Intent(Paras.appContext, AppService.class);
         startService(intent);*/
         Paras.androidNumber= "Android"+android.os.Build.VERSION.RELEASE;
@@ -103,8 +107,34 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                 }
                 switch_text.setText(timeStr);
             }
-            Paras.mulAPIAddr=GetUrl(Paras.mulAPIAddr,deviceData.getApi_ip(),deviceData.getApi_port());
-            Paras.mulHtmlAddr=GetUrl(Paras.mulHtmlAddr,deviceData.getApi_ip(),deviceData.getApi_port());
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    boolean isStopped=false;
+                    while (!isStopped) {
+                        Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,deviceData.getApi_ip(),deviceData.getApi_port());
+                        String urlSuffix="";
+                        if(!Objects.equals(deviceData.getApi_ip(), "")) {
+                            try {
+                                String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getUrlSuffix");
+                                if(!Objects.equals(result, "")) {
+                                    JSONObject object = new JSONObject(result);
+                                    urlSuffix = object.getString("data");
+                                    isStopped=true;
+                                }
+                            } catch (Exception e) {
+                                LogHelper.Error("获取节目地址异常："+e);
+                            }
+                        }
+                        Paras.mulHtmlAddr=GetUrl(Paras.mulHtmlAddr,deviceData.getApi_ip(),deviceData.getApi_port(),urlSuffix);
+                        try {
+                            Thread.sleep(5000);
+                        } catch (Exception e) {
+                            LogHelper.Error(e);
+                        }
+                    }
+                }
+            }).start();
             device_name.setText(deviceData.getDevice_name());
             if(!Objects.equals(deviceData.getApi_ip(), "")) {
                 List<String> inters= Arrays.asList(deviceData.getApi_ip().split("\\."));
@@ -171,8 +201,34 @@ public class MainActivity extends BaseActivity implements IMsgManager {
 
                     DropData deviceType=(DropData)device_type.getSelectedItem();
                     data.setDevice_type(deviceType.getCode());
-                    Paras.mulAPIAddr=GetUrl(Paras.mulAPIAddr,data.getApi_ip(),data.getApi_port());
-                    Paras.mulHtmlAddr=GetUrl(Paras.mulHtmlAddr,data.getApi_ip(),data.getApi_port());
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            boolean isStopped=false;
+                            while (!isStopped) {
+                                Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,deviceData.getApi_ip(),deviceData.getApi_port());
+                                String urlSuffix="";
+                                if(!Objects.equals(deviceData.getApi_ip(), "")) {
+                                    try {
+                                        String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getUrlSuffix");
+                                        if(!Objects.equals(result, "")) {
+                                            JSONObject object = new JSONObject(result);
+                                            urlSuffix = object.getString("data");
+                                            isStopped=true;
+                                        }
+                                    } catch (Exception e) {
+                                        LogHelper.Error("获取节目地址异常："+e);
+                                    }
+                                }
+                                Paras.mulHtmlAddr=GetUrl(Paras.mulHtmlAddr,deviceData.getApi_ip(),deviceData.getApi_port(),urlSuffix);
+                                try {
+                                    Thread.sleep(5000);
+                                } catch (Exception e) {
+                                    LogHelper.Error(e);
+                                }
+                            }
+                        }
+                    }).start();
                     spUnit.Set("DeviceData",data);
                     CmdManager iIniHanlder = new CmdManager();
                     iIniHanlder.Init(MainActivity.this, null);
@@ -253,11 +309,18 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         return "";
     }
 
-    public String GetUrl(String oldUrl,String ip,String port) {
+    public String GetApiUrl(String oldUrl,String ip,String port) {
         String newStr="";
         String tallStr=oldUrl.substring(oldUrl.indexOf("/self"));
         String headStr=oldUrl.substring(0,oldUrl.indexOf("//")+2);
         newStr=headStr+ip+":"+port+tallStr;
+        return newStr;
+    }
+    public String GetUrl(String oldUrl,String ip,String port,String urlSuffix) {
+        String newStr="";
+        String tallStr=oldUrl.substring(oldUrl.indexOf("/app"));
+        String headStr=oldUrl.substring(0,oldUrl.indexOf("//")+2);
+        newStr=headStr+ip+":"+port+"/"+urlSuffix+tallStr;
         return newStr;
     }
 }

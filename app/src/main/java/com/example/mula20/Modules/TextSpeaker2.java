@@ -13,7 +13,7 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
     private boolean speechOver = true;
     public TextSpeaker2(Context context) {
         toSpeech = new TextToSpeech(context, this);
-        toSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+        /*toSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             int i=0;
             @Override
             public void onStart(String s) {//开始播放
@@ -25,10 +25,10 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
                 LogHelper.Debug("onDone完成播放");
                 speechOver = true;
                 //可循环播放
-                        /*if (i<3){
+                        *//*if (i<3){
                             toSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params);
                             i++;
-                        }*/
+                        }*//*
             }
             @Override
             public void onError(String s) {//播放错误的处理
@@ -36,7 +36,7 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
 
                 LogHelper.Error("语音播放错误"+s);
             }
-        });
+        });*/
     }
 
     public void read(final String text) {
@@ -59,6 +59,7 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
                             stopTTS();
                             toSpeech=new TextToSpeech(Paras.appContext,TextSpeaker2.this);
                             read(text);
+                            onStop();
                         }
                         Paras.msgManager.SendMsg("播报："+res);
                     } catch (Exception e) {
@@ -76,7 +77,6 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
 
     @Override
     public void onInit(int status) {
-
         if (status == TextToSpeech.SUCCESS) {
             int result = toSpeech.setLanguage(Locale.US);
             if (result == TextToSpeech.LANG_MISSING_DATA
@@ -87,7 +87,6 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
             if (toSpeech != null) {
                 // 设置音调，值越大声音越尖（女生），值越小则变成男声,1.0是常规
                 toSpeech.setPitch(1.0f);
-                LogHelper.Debug("test语音");
                 LogHelper.Debug("语音模块初始化成功！");
             }
         }
@@ -99,5 +98,11 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
         toSpeech.stop();
         //toSpeech.shutdown();
         toSpeech = null;
+    }
+    public void onStop()
+    {
+        if(toSpeech != null){
+            toSpeech.shutdown();
+        }
     }
 }
