@@ -3,16 +3,20 @@ package com.example.mula20;
 import android.content.Intent;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.RequiresApi;
 
 import com.example.mula20.HttpUnit.HttpUnitFactory;
 import com.example.mula20.Modules.DeviceData;
@@ -24,6 +28,7 @@ import com.example.mula20.Modules.SPUnit;
 import com.example.mula20.models.CmdManager;
 import com.example.mula20.models.DropData;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.net.Inet4Address;
@@ -34,6 +39,7 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class MainActivity extends BaseActivity implements IMsgManager {
 
@@ -46,7 +52,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
     private Spinner device_type;
     private Button btu_save;
     private TextView switch_text;
-
+    private Spinner spinner;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -63,6 +69,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
         device_type= findViewById(R.id.device_type);
         switch_text= findViewById(R.id.switch_text);
+        spinner=findViewById(R.id.spinner);
         List<DropData> dropList=new ArrayList<DropData>();
         DropData dev0=new DropData("test","TEST");
         dropList.add(dev0);
@@ -150,7 +157,23 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                     device_type.setSelection(i);
                 }
             }
+            //获取本地ip
+            WifiManager wifiManager = (WifiManager) Paras.appContext.getSystemService(Paras.appContext.WIFI_SERVICE);
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+            if (!wifiManager.isWifiEnabled()) {
+                wifiManager.setWifiEnabled(true);
+            }
 
+            int ipAddress = wifiInfo.getIpAddress();
+            if(!intToIp(ipAddress).equals("0.0.0.0")) {
+                deviceData.setDevice_ip(intToIp(ipAddress));
+            } else {
+                String ip=getLocalIpAddress();
+                deviceData.setDevice_ip(ip);
+            }
+            if(deviceData.getDevice_ip()!=null&& !Objects.equals(deviceData.getDevice_ip(), "")) {
+                spUnit.Set("DeviceData",deviceData);
+            }
             if (Paras.first) {
                 CmdManager iIniHanlder = new CmdManager();
                 iIniHanlder.Init(MainActivity.this, null);
@@ -241,6 +264,86 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                 }
             }
         });
+
+        //获取机构下拉
+        inter1=findViewById(R.id.inter1);
+        inter2=findViewById(R.id.inter2);
+        inter3=findViewById(R.id.inter3);
+        inter4=findViewById(R.id.inter4);
+        port=findViewById(R.id.port);
+        if(inter1.getText()!=null&&inter2.getText()!=null&&inter3.getText()!=null&&inter3.getText()!=null&&port.getText()!=null) {
+            StringBuilder ipStr=new StringBuilder(inter1.getText().toString());
+            ipStr.append(".");
+            ipStr.append(inter2.getText().toString());
+            ipStr.append(".");
+            ipStr.append(inter3.getText().toString());
+            ipStr.append(".");
+            ipStr.append(inter4.getText().toString());
+            String apiIp=ipStr.toString();
+            String apiPort=port.getText().toString();
+
+            new Thread(new Runnable() {
+                @RequiresApi(api = Build.VERSION_CODES.N)
+                @Override
+                public void run() {
+                    boolean isStopped=false;
+                    while (!isStopped) {
+                        Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,apiIp,apiPort);
+                        try {
+                            String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/orgList");
+                            if(!Objects.equals(result, "")) {
+                                JSONObject object = new JSONObject(result);
+                                JSONArray jsonArray = object.getJSONArray("data");
+                                List<DropData> list=new ArrayList<DropData>();
+                                for(int i=0;i<jsonArray.length();i++) {
+                                    DropData dropdata=new DropData();
+                                    JSONObject obj = jsonArray.getJSONObject(i);
+                                    dropdata.setId(obj.getLong("id"));
+                                    dropdata.setName(obj.getString("org_name"));
+                                    list.add(dropdata);
+                                }
+                                ArrayAdapter<DropData> adapter=new ArrayAdapter<DropData>(Paras.appContext, androidx.appcompat.R.layout.support_simple_spinner_dropdown_item,list);
+                                spinner.setAdapter(adapter);
+
+                                if(deviceData.getOrgId()>0) {
+                                    DropData d=new DropData();
+                                    for(int i=0;i<list.size();i++) {
+                                        if(Objects.equals(list.get(i).getId(), deviceData.getOrgId())) {
+                                            d=list.get(i);
+                                        }
+                                    }
+                                    //DropData d = list.stream().filter(p-> Objects.equals(p.getId(), deviceData.getOrgId())).collect(Collectors.toList()).get(0);
+                                    spinner.setSelection(list.indexOf(d));
+                                }
+
+                                spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                                    @Override
+                                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                                        DropData data= (DropData) spinner.getSelectedItem();
+                                        deviceData.setOrgId(data.getId());
+                                        spUnit.Set("DeviceData",deviceData);
+                                    }
+
+                                    @Override
+                                    public void onNothingSelected(AdapterView<?> parent) {
+
+                                    }
+                                });
+
+                                isStopped=true;
+                            }
+                        } catch (Exception e) {
+                            LogHelper.Error("获取机构列表异常："+e);
+                        }
+                        try {
+                            Thread.sleep(5000);
+                        } catch (Exception e) {
+                            LogHelper.Error(e);
+                        }
+                    }
+                }
+            }).start();
+        }
 
         final Button btn_tts = findViewById(R.id.btu_tts);
         btn_tts.setOnClickListener(new View.OnClickListener() {

@@ -1,7 +1,12 @@
 package com.example.mula20;
 
 import android.annotation.SuppressLint;
+import android.app.ActionBar;
+import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
@@ -9,6 +14,8 @@ import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -23,6 +30,7 @@ import com.example.mula20.Modules.DeviceData;
 import com.example.mula20.Modules.LogHelper;
 import com.example.mula20.Modules.Paras;
 import com.example.mula20.Modules.SPUnit;
+import com.example.mula20.Utils.Base64FileUtil;
 import com.example.mula20.Utils.DateUtil;
 import com.example.mula20.models.MyWebView;
 
@@ -42,14 +50,25 @@ public class ShowActivity extends BaseActivity {
     private Button btn;
     private boolean waitDouble = true;
     private Date endTime=new Date();
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_show);
         btn=  findViewById(R.id.back);
         btn.getBackground().setAlpha(0);
         Paras.appContext=this;
+
+        View decorView = getWindow().getDecorView();
+        // 隐藏状态栏
+        int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
+        decorView.setSystemUiVisibility(uiOptions);
+        //隐藏状态栏时也可以把ActionBar也隐藏掉
+        ActionBar actionBar = getActionBar();
+        //actionBar.hide();
+
         SPUnit spUnit = new SPUnit(ShowActivity.this);
         DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
         webView1=  findViewById(R.id.webView1);
@@ -73,11 +92,23 @@ public class ShowActivity extends BaseActivity {
                 //view.loadUrl("javascript:palyVideo()");
             }
 
-            @Override
+            /*@Override
             public void onPageStarted(WebView view, String url,
                                       Bitmap favicon) {
 
                 super.onPageStarted(view, url, favicon);
+            }*/
+            @Override
+            public void onPageStarted(final WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                //为了使webview加载完数据后resize高度，之所以不放在onPageFinished里，是因为onPageFinished不是每次加载完都会调用
+                int w = View.MeasureSpec.makeMeasureSpec(0,
+                        View.MeasureSpec.UNSPECIFIED);
+                int h = View.MeasureSpec.makeMeasureSpec(0,
+                        View.MeasureSpec.UNSPECIFIED);
+                //重新测量
+                view.measure(w, h);
+
             }
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -133,7 +164,6 @@ public class ShowActivity extends BaseActivity {
                 }
             }
         });
-        playThread.setPriority(1);
         playThread.start();
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -254,21 +284,47 @@ public class ShowActivity extends BaseActivity {
             webView1.onPause();
         }
     }
-/*    @Override
+    @Override
     public void onResume() {
         super.onResume();
-        webView2.onResume();
-        webView1.onResume();
-    }*/
-@Override
-protected void onDestroy() {
-    super.onDestroy();
-    super.onDestroy();
-    webView2.loadUrl("about:blank");
-    webView2.stopLoading();
-    webView2.setWebChromeClient(null);
-    webView2.setWebViewClient(null);
-    webView2.destroy();
-    webView2 = null;
-}
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(5000);
+                        SPUnit spUnit = new SPUnit(Paras.appContext);
+                        DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
+                        LogHelper.Debug("截屏开始");
+                        String picPath = BaseActivity.Screenshot();
+                        String base64Str = Base64FileUtil.encodeBase64File(picPath);
+                        JSONObject uploadObject=new JSONObject();
+                        uploadObject.put("device_id",deviceData.getId());
+                        uploadObject.put("fileFormat",".jpg");
+                        uploadObject.put("base64Str",base64Str);
+                        String res = HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/uploadFile",uploadObject.toString());
+                        JSONObject resObj= new JSONObject(res);
+                        if(!resObj.getBoolean("success")) {
+                            LogHelper.Error("截屏失败：" + picPath);
+                        }
+                        LogHelper.Debug("截屏完成：" + picPath);
+                    } catch (Exception e) {
+                        LogHelper.Error("截屏失败："+e.getMessage());
+                    }
+                }
+            }).start();
+
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        super.onDestroy();
+        webView2.loadUrl("about:blank");
+        webView2.stopLoading();
+        webView2.setWebChromeClient(null);
+        webView2.setWebViewClient(null);
+        webView2.destroy();
+        webView2 = null;
+    }
+
 }

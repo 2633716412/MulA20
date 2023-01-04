@@ -71,6 +71,8 @@ public class CmdManager {
                         jsonObject.put("mac",deviceData.getMac());
                         String androidNumStr="Android "+ Build.VERSION.RELEASE;
                         jsonObject.put("os",androidNumStr);
+                        jsonObject.put("sn",deviceData.getSn());
+                        jsonObject.put("org_id",deviceData.getOrgId());
                         String jsonStr="";
                         try {
                             jsonStr= HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/sava",jsonObject.toString());
@@ -176,17 +178,9 @@ public class CmdManager {
                                                 break;
                                             case "1005":
                                                 LogHelper.Debug("截屏开始");
-                                                Bitmap bmp = BaseActivity.Screenshot();
-                                                ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                                                bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream);
-                                                SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-                                                String fn = formatter.format(new Date()) + ".jpg";
-                                                //String dir = Environment.getExternalStorageDirectory() + "/nf";
-                                                File fileSave = context.getExternalFilesDir("nf");
-                                                String dir=fileSave.getPath();
-                                                File file=new File(dir,fn);
-                                                fileUnitDef.Save(dir, fn, stream.toByteArray());
-                                                String base64Str = Base64FileUtil.encodeBase64File(file.getPath());
+                                                String picPath = BaseActivity.Screenshot();
+
+                                                String base64Str = Base64FileUtil.encodeBase64File(picPath);
                                                 JSONObject uploadObject=new JSONObject();
                                                 uploadObject.put("device_id",deviceData.getId());
                                                 uploadObject.put("fileFormat",".jpg");
@@ -194,9 +188,9 @@ public class CmdManager {
                                                 String res = HttpUnitFactory.Get().Post(Paras.mulAPIAddr + "/media/third/uploadFile",uploadObject.toString());
                                                 JSONObject resObj= new JSONObject(res);
                                                 if(!resObj.getBoolean("success")) {
-                                                    LogHelper.Error("截屏失败：" + dir + "/" + fn);
+                                                    LogHelper.Error("截屏失败：" + picPath);
                                                 }
-                                                LogHelper.Debug("截屏完成：" + dir + "/" + fn);
+                                                LogHelper.Debug("截屏完成：" + picPath);
                                                 break;
                                             case "1006":
                                                 Paras.volume = contentObject.getInt("volume");
@@ -418,7 +412,7 @@ public class CmdManager {
 
         //默认30分钟截屏一次
 
-        Thread shutThread=new Thread(new Runnable() {
+        /*Thread shutThread=new Thread(new Runnable() {
             @Override
             public void run() {
                 new Thread(new Runnable() {
@@ -458,7 +452,7 @@ public class CmdManager {
         if(!Paras.hasRun[2]) {
             pollingUtil.startPolling(shutThread,1800000,true);
             Paras.hasRun[2]=true;
-        }
+        }*/
     }
 
 }
