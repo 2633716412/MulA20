@@ -27,6 +27,7 @@ import com.example.mula20.Modules.Paras;
 import com.example.mula20.Modules.SPUnit;
 import com.example.mula20.models.CmdManager;
 import com.example.mula20.models.DropData;
+import com.example.mula20.models.MyAdapter;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,9 +37,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class MainActivity extends BaseActivity implements IMsgManager {
@@ -175,6 +178,8 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                 spUnit.Set("DeviceData",deviceData);
             }
             if (Paras.first) {
+                deviceData.setSn(getUniquePsuedoID());
+                spUnit.Set("DeviceData",deviceData);
                 CmdManager iIniHanlder = new CmdManager();
                 iIniHanlder.Init(MainActivity.this, null);
                 Paras.updateProgram=true;
@@ -252,6 +257,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                             }
                         }
                     }).start();
+                    data.setSn(getUniquePsuedoID());
                     spUnit.Set("DeviceData",data);
                     CmdManager iIniHanlder = new CmdManager();
                     iIniHanlder.Init(MainActivity.this, null);
@@ -291,47 +297,77 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                         Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,apiIp,apiPort);
                         try {
                             String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/orgList");
-                            if(!Objects.equals(result, "")) {
-                                JSONObject object = new JSONObject(result);
-                                JSONArray jsonArray = object.getJSONArray("data");
-                                List<DropData> list=new ArrayList<DropData>();
-                                for(int i=0;i<jsonArray.length();i++) {
-                                    DropData dropdata=new DropData();
-                                    JSONObject obj = jsonArray.getJSONObject(i);
-                                    dropdata.setId(obj.getLong("id"));
-                                    dropdata.setName(obj.getString("org_name"));
-                                    list.add(dropdata);
-                                }
-                                ArrayAdapter<DropData> adapter=new ArrayAdapter<DropData>(Paras.appContext, androidx.appcompat.R.layout.support_simple_spinner_dropdown_item,list);
-                                spinner.setAdapter(adapter);
-
-                                if(deviceData.getOrgId()>0) {
-                                    DropData d=new DropData();
-                                    for(int i=0;i<list.size();i++) {
-                                        if(Objects.equals(list.get(i).getId(), deviceData.getOrgId())) {
-                                            d=list.get(i);
-                                        }
-                                    }
-                                    //DropData d = list.stream().filter(p-> Objects.equals(p.getId(), deviceData.getOrgId())).collect(Collectors.toList()).get(0);
-                                    spinner.setSelection(list.indexOf(d));
-                                }
-
-                                spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                                    @Override
-                                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                                        DropData data= (DropData) spinner.getSelectedItem();
-                                        deviceData.setOrgId(data.getId());
+                            String orgRes=HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getOrg"+"?sn="+deviceData.getSn());
+                            if(!Objects.equals(orgRes, "")) {
+                                JSONObject orgObj = new JSONObject(orgRes);
+                                boolean orgSuc=orgObj.getBoolean("success");
+                                if(orgSuc) {
+                                    long orgId=orgObj.getLong("data");
+                                    if(orgId>0) {
+                                        deviceData.setOrgId(orgId);
                                         spUnit.Set("DeviceData",deviceData);
                                     }
+                                } else {
+                                    LogHelper.Error("获取设备机构失败："+orgObj.getString("msg"));
+                                }
 
-                                    @Override
-                                    public void onNothingSelected(AdapterView<?> parent) {
-
-                                    }
-                                });
-
-                                isStopped=true;
                             }
+                            if(!Objects.equals(result, "")) {
+                                JSONObject object = new JSONObject(result);
+                                boolean suc=object.getBoolean("success");
+                                if(suc) {
+                                    JSONArray jsonArray = object.getJSONArray("data");
+                                    ArrayList<DropData> list=new ArrayList<DropData>();
+                                    for(int i=0;i<jsonArray.length();i++) {
+                                        DropData dropdata=new DropData();
+                                        JSONObject obj = jsonArray.getJSONObject(i);
+                                        dropdata.setId(obj.getLong("id"));
+                                        dropdata.setName(obj.getString("org_name"));
+                                        list.add(dropdata);
+                                    }
+                                    //ArrayAdapter<DropData> adapter=new ArrayAdapter<>(Paras.appContext, androidx.appcompat.R.layout.support_simple_spinner_dropdown_item,list);
+                                    MyAdapter myAdapter=new MyAdapter(list);
+                                    MainActivity.this.runOnUiThread(new Runnable() {
+                                        public void run() {
+                                            try {
+                                                spinner.setAdapter(myAdapter);
+                                                spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                                                    @Override
+                                                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                                                        DropData data= (DropData) spinner.getSelectedItem();
+                                                        deviceData.setOrgId(data.getId());
+                                                        spUnit.Set("DeviceData",deviceData);
+                                                    }
+
+                                                    @Override
+                                                    public void onNothingSelected(AdapterView<?> parent) {
+
+                                                    }
+                                                });
+                                                if(deviceData.getOrgId()>0) {
+                                                    DropData d=new DropData();
+                                                    for(int i=0;i<list.size();i++) {
+                                                        if(Objects.equals(list.get(i).getId(), deviceData.getOrgId())) {
+                                                            d=list.get(i);
+                                                        }
+                                                    }
+                                                    //DropData d = list.stream().filter(p-> Objects.equals(p.getId(), deviceData.getOrgId())).collect(Collectors.toList()).get(0);
+                                                    spinner.setSelection(list.indexOf(d));
+                                                }
+                                            } catch (Exception e) {
+                                                LogHelper.Error(e);
+                                            }
+
+                                        }
+                                    });
+
+                                    isStopped=true;
+                                } else {
+                                    LogHelper.Error("获取机构下拉失败："+object.getString("msg"));
+                                }
+
+                            }
+
                         } catch (Exception e) {
                             LogHelper.Error("获取机构列表异常："+e);
                         }
@@ -425,5 +461,45 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         String headStr=oldUrl.substring(0,oldUrl.indexOf("//")+2);
         newStr=headStr+ip+":"+port+"/"+urlSuffix+tallStr;
         return newStr;
+    }
+    //获取设备唯一标识，卸载重装后依然能获得唯一值
+    public static String getUniquePsuedoID() {
+
+        String[] supportedABIArray;
+        if (Build.VERSION.SDK_INT >= 21) {
+            supportedABIArray = Build.SUPPORTED_ABIS;
+        } else {
+            supportedABIArray = new String[] {Build.CPU_ABI};
+        }
+
+        String supportedABIs = "";
+        try {
+            for (String s : supportedABIArray) {
+                supportedABIs += s;
+            }
+        } catch (Exception e) {
+            supportedABIs = "";
+        }
+
+        String m_szDevIDShort = "35";
+        if (null != Build.BOARD) m_szDevIDShort += (Build.BOARD.length() % 10);
+        if (null != Build.BRAND) m_szDevIDShort += (Build.BRAND.length() % 10);
+        m_szDevIDShort += (supportedABIs.length() % 10);
+        if (null != Build.DEVICE) m_szDevIDShort += (Build.DEVICE.length() % 10);
+        if (null != Build.MANUFACTURER) m_szDevIDShort += (Build.MANUFACTURER.length() % 10);
+        if (null != Build.MODEL) m_szDevIDShort += (Build.MODEL.length() % 10);
+        if (null != Build.PRODUCT) m_szDevIDShort += (Build.PRODUCT.length() % 10);
+
+        String serial = null;
+        try {
+            serial = android.os.Build.class.getField("SERIAL").get(null).toString();
+
+            return new UUID(m_szDevIDShort.hashCode(), serial.hashCode()).toString();
+        } catch (Exception exception) {
+
+            serial = "" + Calendar.getInstance().getTimeInMillis();
+        }
+
+        return new UUID(m_szDevIDShort.hashCode(), serial.hashCode()).toString();
     }
 }
