@@ -9,7 +9,7 @@ android {
         minSdk 16
         targetSdk 32
         versionCode 1
-        versionName "1.0"
+        versionName "1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -23,6 +23,14 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    android.applicationVariants.all {
+        variant ->
+            variant.outputs.all {
+                //这里修改apk文件名 ，${defaultConfig.versionName} 是在android-defaultConfig里的版本号
+                outputFileName = "NFMul20_v${defaultConfig.versionName}.apk"
+            }
     }
 }
 

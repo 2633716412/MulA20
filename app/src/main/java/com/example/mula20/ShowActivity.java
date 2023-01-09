@@ -144,12 +144,12 @@ public class ShowActivity extends BaseActivity {
         Thread playThread=new Thread(new Runnable() {
             @Override
             public void run() {
-                if(deviceData.getId()>0) {
-                    GetProgramData(deviceData.getId());
+                if(!Objects.equals(deviceData.getSn(), "")) {
+                    GetProgramData(deviceData.getSn());
                     while (true) {
                         Date nowTime=new Date();
                         if(Paras.updateProgram) {
-                            endTime=GetProgramData(deviceData.getId());
+                            endTime=GetProgramData(deviceData.getSn());
                             Paras.updateProgram=false;
                         }
                         if(nowTime.getTime()>endTime.getTime()) {
@@ -196,12 +196,12 @@ public class ShowActivity extends BaseActivity {
         //截屏，默认隔30分钟截屏一次
     }
 
-    public Date GetProgramData(Long id) {
+    public Date GetProgramData(String sn) {
         Date date=new Date();
         try {
             String jsonStr="";
             try {
-                jsonStr = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getProgramData?device_id=" + id);
+                jsonStr = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getProgramData?sn=" + sn);
             } catch (Exception e) {
                 LogHelper.Error("获取节目异常："+e);
                 Paras.updateProgram=true;
@@ -288,7 +288,7 @@ public class ShowActivity extends BaseActivity {
     public void onResume() {
         super.onResume();
 
-            new Thread(new Runnable() {
+            /*new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -312,8 +312,7 @@ public class ShowActivity extends BaseActivity {
                         LogHelper.Error("截屏失败："+e.getMessage());
                     }
                 }
-            }).start();
-
+            }).start();*/
     }
     @Override
     protected void onDestroy() {

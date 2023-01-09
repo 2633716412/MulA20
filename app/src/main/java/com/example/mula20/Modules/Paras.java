@@ -63,6 +63,7 @@ public class Paras {
 
     public static boolean[] hasRun=new boolean[3];
 
+    public static int num=0;
     //</editor-fold>
 
 }

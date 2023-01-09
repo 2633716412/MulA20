@@ -105,4 +105,10 @@ public class TextSpeaker2 implements TextToSpeech.OnInitListener {
             toSpeech.shutdown();
         }
     }
+    //语速
+    public void setSpeed(Long speed)
+    {
+        float v = speed / 50f;
+        toSpeech.setSpeechRate(v);
+    }
 }

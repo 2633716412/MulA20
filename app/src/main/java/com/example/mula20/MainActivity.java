@@ -76,10 +76,6 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         List<DropData> dropList=new ArrayList<DropData>();
         DropData dev0=new DropData("test","TEST");
         dropList.add(dev0);
-        DropData dev1=new DropData("a20","DEVA20");
-        dropList.add(dev1);
-        DropData dev2=new DropData("a40","DEVA40");
-        dropList.add(dev2);
         DropData dev3=new DropData("a20xp","DEVA20_XiPin");
         dropList.add(dev3);
         DropData dev4=new DropData("a40xp","DEVA40_XiPin");
@@ -89,7 +85,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         ArrayAdapter<DropData> adapter = new ArrayAdapter<DropData>(MainActivity.this, android.R.layout.simple_spinner_item, dropList);
         device_type.setAdapter(adapter);
 
-        if(deviceData.getId()>0) {
+        if(!Objects.equals(deviceData.getSn(), "")) {
             device_name=  findViewById(R.id.device_name);
             inter1=  findViewById(R.id.inter1);
             inter2=  findViewById(R.id.inter2);
@@ -122,6 +118,8 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                 public void run() {
                     boolean isStopped=false;
                     while (!isStopped) {
+                        SPUnit spUnit = new SPUnit(MainActivity.this);
+                        DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                         Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,deviceData.getApi_ip(),deviceData.getApi_port());
                         String urlSuffix="";
                         if(!Objects.equals(deviceData.getApi_ip(), "")) {
@@ -129,8 +127,10 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                 String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getUrlSuffix");
                                 if(!Objects.equals(result, "")) {
                                     JSONObject object = new JSONObject(result);
-                                    urlSuffix = object.getString("data");
-                                    isStopped=true;
+                                    if(object.getBoolean("success")) {
+                                        urlSuffix = object.getString("data");
+                                        isStopped=true;
+                                    }
                                 }
                             } catch (Exception e) {
                                 LogHelper.Error("获取节目地址异常："+e);
@@ -226,14 +226,17 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                     data.setDevice_name(device_name.getText().toString());
                     data.setApi_ip(ipStr);
                     data.setApi_port(port.getText().toString());
-
+                    spUnit.Set("DeviceData",data);
                     DropData deviceType=(DropData)device_type.getSelectedItem();
                     data.setDevice_type(deviceType.getCode());
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
+
                             boolean isStopped=false;
                             while (!isStopped) {
+                                SPUnit spUnit = new SPUnit(MainActivity.this);
+                                DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                 Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,deviceData.getApi_ip(),deviceData.getApi_port());
                                 String urlSuffix="";
                                 if(!Objects.equals(deviceData.getApi_ip(), "")) {
@@ -241,8 +244,11 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                         String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getUrlSuffix");
                                         if(!Objects.equals(result, "")) {
                                             JSONObject object = new JSONObject(result);
-                                            urlSuffix = object.getString("data");
-                                            isStopped=true;
+                                            if(object.getBoolean("success")) {
+                                                urlSuffix = object.getString("data");
+                                                isStopped=true;
+                                            }
+
                                         }
                                     } catch (Exception e) {
                                         LogHelper.Error("获取节目地址异常："+e);
@@ -272,29 +278,14 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         });
 
         //获取机构下拉
-        inter1=findViewById(R.id.inter1);
-        inter2=findViewById(R.id.inter2);
-        inter3=findViewById(R.id.inter3);
-        inter4=findViewById(R.id.inter4);
-        port=findViewById(R.id.port);
-        if(inter1.getText()!=null&&inter2.getText()!=null&&inter3.getText()!=null&&inter3.getText()!=null&&port.getText()!=null) {
-            StringBuilder ipStr=new StringBuilder(inter1.getText().toString());
-            ipStr.append(".");
-            ipStr.append(inter2.getText().toString());
-            ipStr.append(".");
-            ipStr.append(inter3.getText().toString());
-            ipStr.append(".");
-            ipStr.append(inter4.getText().toString());
-            String apiIp=ipStr.toString();
-            String apiPort=port.getText().toString();
-
+            if(!Objects.equals(Paras.mulAPIAddr, "http://ip:port/selfv2api")) {
             new Thread(new Runnable() {
                 @RequiresApi(api = Build.VERSION_CODES.N)
                 @Override
                 public void run() {
                     boolean isStopped=false;
                     while (!isStopped) {
-                        Paras.mulAPIAddr=GetApiUrl(Paras.mulAPIAddr,apiIp,apiPort);
+
                         try {
                             String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/orgList");
                             String orgRes=HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getOrg"+"?sn="+deviceData.getSn());
@@ -304,6 +295,8 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                 if(orgSuc) {
                                     long orgId=orgObj.getLong("data");
                                     if(orgId>0) {
+                                        SPUnit spUnit = new SPUnit(MainActivity.this);
+                                        DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                         deviceData.setOrgId(orgId);
                                         spUnit.Set("DeviceData",deviceData);
                                     }
@@ -330,11 +323,15 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                     MainActivity.this.runOnUiThread(new Runnable() {
                                         public void run() {
                                             try {
+                                                SPUnit spUnit = new SPUnit(MainActivity.this);
+                                                DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                                 spinner.setAdapter(myAdapter);
                                                 spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                                                     @Override
                                                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                                                         DropData data= (DropData) spinner.getSelectedItem();
+                                                        SPUnit spUnit = new SPUnit(MainActivity.this);
+                                                        DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                                         deviceData.setOrgId(data.getId());
                                                         spUnit.Set("DeviceData",deviceData);
                                                     }
