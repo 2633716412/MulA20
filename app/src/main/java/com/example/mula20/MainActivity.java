@@ -7,6 +7,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -72,6 +74,11 @@ public class MainActivity extends BaseActivity implements IMsgManager {
         DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
         device_type= findViewById(R.id.device_type);
         switch_text= findViewById(R.id.switch_text);
+        inter1=findViewById(R.id.inter1);
+        inter2=findViewById(R.id.inter2);
+        inter3=findViewById(R.id.inter3);
+        inter4=findViewById(R.id.inter4);
+        port=findViewById(R.id.port);
         spinner=findViewById(R.id.spinner);
         List<DropData> dropList=new ArrayList<DropData>();
         DropData dev0=new DropData("test","TEST");
@@ -277,49 +284,137 @@ public class MainActivity extends BaseActivity implements IMsgManager {
             }
         });
 
-        //获取机构下拉
-            if(!Objects.equals(Paras.mulAPIAddr, "http://ip:port/selfv2api")) {
-            new Thread(new Runnable() {
-                @RequiresApi(api = Build.VERSION_CODES.N)
-                @Override
-                public void run() {
-                    boolean isStopped=false;
-                    while (!isStopped) {
+        inter1.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String str=s.toString();
+                if(str.contains(".")|| str.contains("\r") || str.contains("\n")) {
+                    inter1.setText(str.replace(".","").replace("\r","").replace("\n",""));
+                    inter2.requestFocus();
+                }
+            }
+        });
+        inter2.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String str=s.toString();
+                if(str.contains(".")|| str.contains("\r") || str.contains("\n")) {
+                    inter2.setText(str.replace(".","").replace("\r","").replace("\n",""));
+                    inter3.requestFocus();
+                }
+            }
+        });
+        inter3.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String str=s.toString();
+                if(str.contains(".")|| str.contains("\r") || str.contains("\n")) {
+                    inter3.setText(str.replace(".","").replace("\r","").replace("\n",""));
+                    inter4.requestFocus();
+                }
+            }
+        });
+        inter4.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String str=s.toString();
+                if(str.contains(".")|| str.contains("\r") || str.contains("\n")) {
+                    inter4.setText(str.replace(":","").replace("\r","").replace("\n",""));
+                    port.requestFocus();
+                }
+            }
+        });
+        //获取机构下拉
+
+        new Thread(new Runnable() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
+            @Override
+            public void run() {
+                boolean isStopped = false;
+                while (!isStopped) {
+                    if (!inter1.getText().toString().trim().equals("") && !inter2.getText().toString().trim().equals("") && !inter3.getText().toString().trim().equals("") && !inter4.getText().toString().trim().equals("") && !port.getText().toString().trim().equals("")) {
+                        StringBuilder ipStr = new StringBuilder(inter1.getText().toString());
+                        ipStr.append(".");
+                        ipStr.append(inter2.getText().toString());
+                        ipStr.append(".");
+                        ipStr.append(inter3.getText().toString());
+                        ipStr.append(".");
+                        ipStr.append(inter4.getText().toString());
+                        Paras.mulAPIAddr = GetApiUrl(Paras.mulAPIAddr, ipStr.toString(), port.getText().toString());
                         try {
-                            String result= HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/orgList");
-                            String orgRes=HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getOrg"+"?sn="+deviceData.getSn());
-                            if(!Objects.equals(orgRes, "")) {
+                            String result = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/orgList");
+                            String orgRes = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getOrg" + "?sn=" + deviceData.getSn());
+                            if (!Objects.equals(orgRes, "")) {
                                 JSONObject orgObj = new JSONObject(orgRes);
-                                boolean orgSuc=orgObj.getBoolean("success");
-                                if(orgSuc) {
-                                    long orgId=orgObj.getLong("data");
-                                    if(orgId>0) {
+                                boolean orgSuc = orgObj.getBoolean("success");
+                                if (orgSuc) {
+                                    long orgId = orgObj.getLong("data");
+                                    if (orgId > 0) {
                                         SPUnit spUnit = new SPUnit(MainActivity.this);
                                         DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                         deviceData.setOrgId(orgId);
-                                        spUnit.Set("DeviceData",deviceData);
+                                        spUnit.Set("DeviceData", deviceData);
                                     }
                                 } else {
-                                    LogHelper.Error("获取设备机构失败："+orgObj.getString("msg"));
+                                    LogHelper.Error("获取设备机构失败：" + orgObj.getString("msg"));
                                 }
 
                             }
-                            if(!Objects.equals(result, "")) {
+                            if (!Objects.equals(result, "")) {
                                 JSONObject object = new JSONObject(result);
-                                boolean suc=object.getBoolean("success");
-                                if(suc) {
+                                boolean suc = object.getBoolean("success");
+                                if (suc) {
                                     JSONArray jsonArray = object.getJSONArray("data");
-                                    ArrayList<DropData> list=new ArrayList<DropData>();
-                                    for(int i=0;i<jsonArray.length();i++) {
-                                        DropData dropdata=new DropData();
+                                    ArrayList<DropData> list = new ArrayList<DropData>();
+                                    for (int i = 0; i < jsonArray.length(); i++) {
+                                        DropData dropdata = new DropData();
                                         JSONObject obj = jsonArray.getJSONObject(i);
                                         dropdata.setId(obj.getLong("id"));
                                         dropdata.setName(obj.getString("org_name"));
                                         list.add(dropdata);
                                     }
                                     //ArrayAdapter<DropData> adapter=new ArrayAdapter<>(Paras.appContext, androidx.appcompat.R.layout.support_simple_spinner_dropdown_item,list);
-                                    MyAdapter myAdapter=new MyAdapter(list);
+                                    MyAdapter myAdapter = new MyAdapter(list);
                                     MainActivity.this.runOnUiThread(new Runnable() {
                                         public void run() {
                                             try {
@@ -329,11 +424,11 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                                 spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                                                     @Override
                                                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                                                        DropData data= (DropData) spinner.getSelectedItem();
+                                                        DropData data = (DropData) spinner.getSelectedItem();
                                                         SPUnit spUnit = new SPUnit(MainActivity.this);
                                                         DeviceData deviceData = spUnit.Get("DeviceData", DeviceData.class);
                                                         deviceData.setOrgId(data.getId());
-                                                        spUnit.Set("DeviceData",deviceData);
+                                                        spUnit.Set("DeviceData", deviceData);
                                                     }
 
                                                     @Override
@@ -341,11 +436,11 @@ public class MainActivity extends BaseActivity implements IMsgManager {
 
                                                     }
                                                 });
-                                                if(deviceData.getOrgId()>0) {
-                                                    DropData d=new DropData();
-                                                    for(int i=0;i<list.size();i++) {
-                                                        if(Objects.equals(list.get(i).getId(), deviceData.getOrgId())) {
-                                                            d=list.get(i);
+                                                if (deviceData.getOrgId() > 0) {
+                                                    DropData d = new DropData();
+                                                    for (int i = 0; i < list.size(); i++) {
+                                                        if (Objects.equals(list.get(i).getId(), deviceData.getOrgId())) {
+                                                            d = list.get(i);
                                                         }
                                                     }
                                                     //DropData d = list.stream().filter(p-> Objects.equals(p.getId(), deviceData.getOrgId())).collect(Collectors.toList()).get(0);
@@ -358,15 +453,15 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                                         }
                                     });
 
-                                    isStopped=true;
+                                    isStopped = true;
                                 } else {
-                                    LogHelper.Error("获取机构下拉失败："+object.getString("msg"));
+                                    LogHelper.Error("获取机构下拉失败：" + object.getString("msg"));
                                 }
 
                             }
 
                         } catch (Exception e) {
-                            LogHelper.Error("获取机构列表异常："+e);
+                            LogHelper.Error("获取机构列表异常：" + e);
                         }
                         try {
                             Thread.sleep(5000);
@@ -374,9 +469,10 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                             LogHelper.Error(e);
                         }
                     }
+
                 }
-            }).start();
-        }
+            }
+        }).start();
 
         final Button btn_tts = findViewById(R.id.btu_tts);
         btn_tts.setOnClickListener(new View.OnClickListener() {
