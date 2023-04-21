@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
@@ -22,14 +23,18 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 
 import com.example.mula20.HttpUnit.HttpUnitFactory;
 import com.example.mula20.Modules.DeviceData;
 import com.example.mula20.Modules.LogHelper;
+import com.example.mula20.Modules.NetWorkUtils;
 import com.example.mula20.Modules.Paras;
 import com.example.mula20.Modules.SPUnit;
+import com.example.mula20.Modules.StringUnit;
 import com.example.mula20.Utils.Base64FileUtil;
 import com.example.mula20.Utils.DateUtil;
 import com.example.mula20.models.MyWebView;
@@ -49,7 +54,9 @@ public class ShowActivity extends BaseActivity {
     private MyWebView webView2;
     private Button btn;
     private boolean waitDouble = true;
+    private EditText et_input;
     private Date endTime=new Date();
+    public static KeepFocusThread keepFocusThread;
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -193,81 +200,121 @@ public class ShowActivity extends BaseActivity {
                 }
             }
         });
-        //截屏，默认隔30分钟截屏一次
+        et_input = findViewById(R.id.et_input);
+        et_input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+
+            Date last = new Date();
+
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+
+                String text = v.getText().toString();
+
+                if (StringUnit.isEmpty(text)) {
+                    return true;
+                }
+
+                Date now = new Date();
+                long n = now.getTime();
+                long l = last.getTime();
+
+                if (n - l < 2000) {
+                    v.setText("");
+                    return true;
+                } else {
+                    last = now;
+                }
+
+                if (event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+                    Paras.msgManager.SendMsg("扫：" + text);
+                    try{
+                        Checkin(text);
+                    } catch (Exception e) {
+                        LogHelper.Error("扫码异常"+e);
+                    }
+
+                    v.setText("");
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        });
+        keepFocusThread = new KeepFocusThread();
+        keepFocusThread.start();
     }
 
     public Date GetProgramData(String sn) {
         Date date=new Date();
         try {
-            String jsonStr="";
-            try {
-                jsonStr = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getProgramData?sn=" + sn);
-            } catch (Exception e) {
-                LogHelper.Error("获取节目异常："+e);
-                Paras.updateProgram=true;
-            }
-            if(!Objects.equals(jsonStr, "")) {
-                JSONObject object = new JSONObject(jsonStr);
-                StringBuilder url = new StringBuilder(Paras.mulHtmlAddr);
-                String wvUrl="";
-                JSONArray itemArray = object.getJSONArray("data");
-                final boolean[] first = {false};
-                if(object.getBoolean("success")) {
-                    for (int i = 0; i < itemArray.length(); i++) {
-                        JSONObject object1 = itemArray.getJSONObject(i);
-                        String repeatDay = object1.getString("repet_day");
-                        Long programId = object1.getLong("program_id");
-                        String underUrl=object1.getString("under_url");
-                        DateUtil dateUtil = new DateUtil();
-                        String nowWeek = String.valueOf(dateUtil.DayOfWeek());
-                        if (repeatDay.contains(nowWeek)) {
-                            JSONArray timeList = object1.getJSONArray("time_list");
-                            for (int j = 0; j < timeList.length(); j++) {
-                                JSONObject timeObject = timeList.getJSONObject(j);
-                                String startStr = timeObject.getString("begin_time");
-                                String endStr = timeObject.getString("end_time");
-                                DateUtil begin = DateUtil.GetByHourMin(startStr);
-                                DateUtil end = DateUtil.GetByHourMin(endStr);
-                                DateUtil now = DateUtil.Now();
-                                if (now.Between(begin, end)&& !first[0]) {
-                                    List<String> timeStr= Arrays.asList(endStr.split(":"));
-                                    Calendar start = Calendar.getInstance();
-                                    int hour= Integer.parseInt(timeStr.get(0));
-                                    int minutes= Integer.parseInt(timeStr.get(1));
-                                    start.setTime(new Date());
-                                    start.set( Calendar.HOUR_OF_DAY,hour);
-                                    start.set( Calendar.MINUTE, minutes);
-                                    start.set( Calendar.SECOND,0);
-                                    date=start.getTime();
-                                    url.append("?id=").append(programId);
-                                    if(underUrl!=null&& !underUrl.equals("")) {
-                                        wvUrl=underUrl;
+            boolean isStopped=false;
+            while (!isStopped) {
+                String jsonStr="";
+                try {
+                    jsonStr = HttpUnitFactory.Get().Get(Paras.mulAPIAddr + "/media/third/getProgramData?sn=" + sn);
+                    isStopped=true;
+                } catch (Exception e) {
+                    LogHelper.Error("获取节目异常："+e);
+                    Paras.updateProgram=true;
+                }
+                if(!Objects.equals(jsonStr, "")) {
+                    JSONObject object = new JSONObject(jsonStr);
+                    StringBuilder url = new StringBuilder(Paras.mulHtmlAddr);
+                    String wvUrl="";
+                    JSONArray itemArray = object.getJSONArray("data");
+                    final boolean[] first = {false};
+                    if(object.getBoolean("success")) {
+                        for (int i = 0; i < itemArray.length(); i++) {
+                            JSONObject object1 = itemArray.getJSONObject(i);
+                            String repeatDay = object1.getString("repet_day");
+                            Long programId = object1.getLong("program_id");
+                            String underUrl=object1.getString("under_url");
+                            DateUtil dateUtil = new DateUtil();
+                            String nowWeek = String.valueOf(dateUtil.DayOfWeek());
+                            if (repeatDay.contains(nowWeek)) {
+                                JSONArray timeList = object1.getJSONArray("time_list");
+                                for (int j = 0; j < timeList.length(); j++) {
+                                    JSONObject timeObject = timeList.getJSONObject(j);
+                                    String startStr = timeObject.getString("begin_time");
+                                    String endStr = timeObject.getString("end_time");
+                                    DateUtil begin = DateUtil.GetByHourMin(startStr);
+                                    DateUtil end = DateUtil.GetByHourMin(endStr);
+                                    DateUtil now = DateUtil.Now();
+                                    if (now.Between(begin, end)&& !first[0]) {
+                                        List<String> timeStr= Arrays.asList(endStr.split(":"));
+                                        Calendar start = Calendar.getInstance();
+                                        int hour= Integer.parseInt(timeStr.get(0));
+                                        int minutes= Integer.parseInt(timeStr.get(1));
+                                        start.setTime(new Date());
+                                        start.set( Calendar.HOUR_OF_DAY,hour);
+                                        start.set( Calendar.MINUTE, minutes);
+                                        start.set( Calendar.SECOND,0);
+                                        date=start.getTime();
+                                        url.append("?id=").append(programId);
+                                        if(underUrl!=null&& !underUrl.equals("")) {
+                                            wvUrl=underUrl;
+                                        }
+                                        first[0] =true;
                                     }
-                                    first[0] =true;
                                 }
                             }
                         }
-                    }
-                    String finalWvUrl = wvUrl;
-                    ShowActivity.this.runOnUiThread(new Runnable() {
-                        //boolean firstLoad=false;
-                        public void run() {
-                            try {
-                                /*if(!firstLoad) {
+                        String finalWvUrl = wvUrl;
+                        ShowActivity.this.runOnUiThread(new Runnable() {
+                            public void run() {
+                                try {
                                     webView2.loadUrl(url.toString());
                                     webView1.loadUrl(finalWvUrl);
-                                    firstLoad=true;
-                                }*/
-                                webView2.loadUrl(url.toString());
-                                webView1.loadUrl(finalWvUrl);
-                            } catch (Exception e) {
-                                LogHelper.Error(e);
-                            }
+                                } catch (Exception e) {
+                                    LogHelper.Error(e);
+                                }
 
-                        }
-                    });
+                            }
+                        });
+                    }
                 }
             }
+
             //Thread.sleep(3000);
         } catch (Exception e) {
             LogHelper.Error(e);
@@ -324,6 +371,44 @@ public class ShowActivity extends BaseActivity {
         webView2.setWebViewClient(null);
         webView2.destroy();
         webView2 = null;
+    }
+
+    public class KeepFocusThread extends Thread {
+        public boolean stop = false;
+
+        @Override
+        public void run() {
+            super.run();
+            while (!stop) {
+                try {
+                    Thread.sleep(500);
+                    et_input.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            et_input.setFocusable(true);
+                            et_input.setFocusableInTouchMode(true);
+                            et_input.requestFocus();
+
+                            //Log.e("KeepFocusThread", "requestFocus!!!");
+
+                        }
+                    }, 100);
+                } catch (Exception ex) {
+                    LogHelper.Error(ex);
+                }
+            }
+        }
+    }
+
+    private void Checkin(String cardNo) {
+        webView2.post(new Runnable() {
+            @Override
+            public void run() {
+                String ip = NetWorkUtils.GetIP(Paras.appContext);
+                LogHelper.Debug("checkin " + ip + " " + cardNo);
+                webView2.loadUrl("javascript:checkin(\"" + ip + "\"," + "\"" + cardNo + "\")");
+            }
+        });
     }
 
 }

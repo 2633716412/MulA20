@@ -54,7 +54,6 @@ abstract class BasePowerManager implements IPowerManager {
                     opening = false;
                     LogHelper.Debug("预设时间已到，准备关机...");
                     Paras.msgManager.SendMsg("预设时间已到，准备关机...");
-                    getLock(Paras.appContext);
                     ShutDown();
                 } catch (Exception ex) {
                     opening = temp;
@@ -68,7 +67,6 @@ abstract class BasePowerManager implements IPowerManager {
                     LogHelper.Debug("预设时间已到，准备开机...");
                     Paras.msgManager.SendMsg("预设时间已到，准备开机...");
                     Open();
-                    releaseLock();
                 } catch (Exception ex) {
                     opening = temp;
                     LogHelper.Error(ex);
@@ -230,7 +228,7 @@ abstract class BasePowerManager implements IPowerManager {
         return "";
     }
 
-    private PowerManager.WakeLock mWakeLock;
+    /*private PowerManager.WakeLock mWakeLock;
     synchronized private void getLock(Context context) {
         if (mWakeLock == null) {
             PowerManager mgr = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -257,5 +255,5 @@ abstract class BasePowerManager implements IPowerManager {
 
             mWakeLock = null;
         }
-    }
+    }*/
 }

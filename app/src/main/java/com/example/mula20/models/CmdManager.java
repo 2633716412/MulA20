@@ -31,6 +31,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
@@ -139,6 +140,8 @@ public class CmdManager {
                                     if(res) {
                                         if (Paras.num==0) {
                                             LogHelper.Debug("更新心跳时间成功");
+                                            Paras.num++;
+                                        } else {
                                             Paras.num++;
                                             if(Paras.num>=5) {
                                                 Paras.num=0;
@@ -324,6 +327,14 @@ public class CmdManager {
                                                 Paras.volume= Math.toIntExact(voiceVolume);
                                                 //textSpeaker2.setSpeed(voiceSpeed);
                                                 textSpeaker2.read(voiceDate);
+                                                break;
+                                            case "1033":
+                                                File logFile=new File(LogHelper.logFilePath);
+                                                FileWriter fileWriter=new FileWriter(logFile);
+                                                fileWriter.write("");
+                                                fileWriter.flush();
+                                                fileWriter.close();
+                                                LogHelper.Debug("日志清理完毕");
                                                 break;
                                             default:break;
                                         }

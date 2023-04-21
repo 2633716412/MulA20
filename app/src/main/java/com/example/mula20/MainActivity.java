@@ -185,7 +185,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                 spUnit.Set("DeviceData",deviceData);
             }
             if (Paras.first) {
-                deviceData.setSn(getUniquePsuedoID());
+                deviceData.setSn(getUniquePsuedoID()+deviceData.getDevice_ip());
                 spUnit.Set("DeviceData",deviceData);
                 CmdManager iIniHanlder = new CmdManager();
                 iIniHanlder.Init(MainActivity.this, null);
@@ -270,7 +270,7 @@ public class MainActivity extends BaseActivity implements IMsgManager {
                             }
                         }
                     }).start();
-                    data.setSn(getUniquePsuedoID());
+                    data.setSn(getUniquePsuedoID()+data.getDevice_ip());
                     spUnit.Set("DeviceData",data);
                     CmdManager iIniHanlder = new CmdManager();
                     iIniHanlder.Init(MainActivity.this, null);
